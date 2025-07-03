@@ -4,36 +4,14 @@
 }
 
 
+.loc-details{
+  position:absolute;
+  height:auto;
+  width:15vw;
 
-.search-bar {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 999;
-  background-color:rgb(4, 87, 43);
-  padding: 8px 12px;
-  border-radius: 8px;
-  box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
-}
-
-.search-bar input {
-  padding: 5px;
-  font-size: 15px;
-  border-radius:5px;
-  width: 200px;
-  margin-right: 8px;
-  border:"none"
-}
-
-.search-bar button {
-  padding: 6px 10px;
-  font-size: 14px;
-  cursor: pointer;
-  background-color:rgb(3, 117, 56);
-  border-radius: 5px;
-  color: white;
-  font-weight: bold;
-
-
+  right:10px;
+  bottom:30px;
+  z-index:450;
+  padding:10px;
+  background-color: #ecebeb;
 }
