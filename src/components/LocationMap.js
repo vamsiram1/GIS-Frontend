@@ -14,8 +14,7 @@ import osmtogeojson from "osmtogeojson";
 
 // 🔴 Red marker icon
 const redIcon = new L.Icon({
-    iconUrl:
-        "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
+    iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
     shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
     iconSize: [25, 41],
     iconAnchor: [12, 41],
@@ -23,7 +22,7 @@ const redIcon = new L.Icon({
     shadowSize: [41, 41],
 });
 
-// 🔄 Fly to city or district/state
+// ✈️ Fly to point or polygon
 const FlyToLocation = ({ selectedLocation, selectedFeature }) => {
     const map = useMap();
 
@@ -35,8 +34,7 @@ const FlyToLocation = ({ selectedLocation, selectedFeature }) => {
                 duration: 1,
             });
         } else if (
-            (selectedLocation.type === "district" ||
-                selectedLocation.type === "state") &&
+            (selectedLocation.type === "district" || selectedLocation.type === "state") &&
             selectedFeature
         ) {
             const layer = L.geoJSON(selectedFeature);
@@ -50,23 +48,11 @@ const FlyToLocation = ({ selectedLocation, selectedFeature }) => {
     return null;
 };
 
-// 🔷 Show only one boundary
-const GeoBoundaries = ({ feature }) => {
-    if (!feature) return null;
-
-    return (
-        <GeoJSON
-            data={feature}
-            style={{
-                color: "#be59f7", // purple border
-                weight: 3,
-                fillOpacity: 0, // border only
-            }}
-            onEachFeature={(feature, layer) => {
-                layer.bindPopup(feature.properties?.name || "Unknown");
-            }}
-        />
-    );
+// 🌈 Generate pastel color from name
+const getRandomColor = (name) => {
+    const hash = name.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const hue = hash % 360;
+    return `hsl(${hue}, 70%, 70%)`;
 };
 
 const LocationMap = () => {
@@ -75,50 +61,58 @@ const LocationMap = () => {
     const [selectedFeature, setSelectedFeature] = useState(null);
     const [search, setSearch] = useState("");
     const [selectedLocation, setSelectedLocation] = useState(null);
+    const [stateBoundaries, setStateBoundaries] = useState(null);
 
-    // 🌐 Load point locations
+    // 🔴 Load school/point data
     useEffect(() => {
         fetch("http://localhost:8080/locations")
-            .then((res) => {
-                if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
-                return res.json();
-            })
+            .then((res) => res.json())
             .then((data) => {
-                console.log("📍 All Locations from API:", data);
-
                 if (Array.isArray(data)) {
-                    const filtered = data.filter((loc) => {
-                        const isValid =
+                    const filtered = data.filter(
+                        (loc) =>
                             loc.id &&
                             loc.name &&
                             typeof loc.latitude === "number" &&
-                            typeof loc.longitude === "number";
-
-                        if (!isValid) {
-                            console.warn("⚠️ Skipped invalid location:", loc);
-                        }
-
-                        return isValid;
-                    });
-
-                    const withTypes = filtered.map((loc) => ({
-                        ...loc,
-                        type: "point", // 🔄 mark them as point
-                    }));
-
+                            typeof loc.longitude === "number"
+                    );
+                    const withTypes = filtered.map((loc) => ({ ...loc, type: "point" }));
                     setLocations(withTypes);
                 } else {
-                    console.error("🚨 Invalid locations data:", data);
-                    setLocations([]);
+                    console.error("Invalid location data");
                 }
             })
             .catch((err) => {
-                console.error("🚨 Error fetching locations:", err);
-                alert("Failed to fetch locations. Please check the backend.");
+                console.error("Error fetching locations:", err);
+                alert("Failed to fetch locations");
             });
     }, []);
 
-    // 🔍 Fetch boundary from backend Overpass API
+    // 🟦 Load India states GeoJSON
+    useEffect(() => {
+        fetch("http://localhost:8080/india-states.geojson")
+            .then((res) => res.json())
+            .then((geojson) => {
+                const filtered = {
+                    ...geojson,
+                    features: geojson.features.filter(
+                        (f) =>
+                            f.geometry &&
+                            (f.properties?.ST_NM || f.properties?.name || f.properties?.tags?.name)
+                    ),
+                };
+                if (filtered.features.length > 0) {
+                    setStateBoundaries(filtered);
+                } else {
+                    console.warn("No valid state boundaries found");
+                }
+            })
+            .catch((err) => {
+                console.error("Error loading GeoJSON:", err);
+            });
+    }, []);
+
+    // 🟩 Fetch district polygon from Overpass API
     const fetchDistrictBoundary = async (districtName) => {
         try {
             const res = await fetch(
@@ -139,7 +133,7 @@ const LocationMap = () => {
                     setSelectedFeature(matched);
                     setSelectedLocation({ name: districtName, type: "district" });
                 } else {
-                    alert("Boundary not found in GeoJSON");
+                    alert("Boundary not found");
                 }
             } else {
                 alert("No features found");
@@ -150,31 +144,75 @@ const LocationMap = () => {
         }
     };
 
-    // 🔍 Search handler
+    // 🔍 Handle search
     const handleSearch = (e) => {
         e.preventDefault();
         if (!search.trim()) return;
 
         const match = locations.find(
-            (loc) =>
-                loc.name.toLowerCase().trim() === search.toLowerCase().trim()
+            (loc) => loc.name.toLowerCase().trim() === search.toLowerCase().trim()
         );
 
-        setSelectedFeature(null); // clear previous district boundary
+        setSelectedFeature(null);
 
         if (match) {
-            setSelectedLocation(match); // fly to point
+            setSelectedLocation(match);
         } else {
-            fetchDistrictBoundary(search); // treat as district
+            fetchDistrictBoundary(search);
         }
     };
 
     return (
         <div>
-            {/* 🔎 Search bar */}
+            {/* 🔍 Search Box */}
+            <form
+                onSubmit={handleSearch}
+                style={{
+                    margin: "10px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    zIndex: 999,
+                    position: "absolute",
+                    top: "10px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    backgroundColor: "white",
+                    padding: "10px",
+                    borderRadius: "10px",
+                    boxShadow: "0 0 10px rgba(0,0,0,0.2)",
+                }}
+            >
+                <input
+                    type="text"
+                    placeholder="Enter city, district, or state"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    style={{
+                        padding: "9px",
+                        width: "250px",
+                        borderRadius: "5px",
+                        border: "1px solid #ccc",
+                    }}
+                />
+                <button
+                    type="submit"
+                    style={{
+                        padding: "6px 15px",
+                        marginLeft: "10px",
+                        borderRadius: "5px",
+                        backgroundColor: "#d4a3f0",
+                        border: "none",
+                        fontWeight: "bold",
+                        fontSize: "15px",
+                        color: "#152102",
+                    }}
+                >
+                    Go
+                </button>
+            </form>
 
-
-            {/* 🗺️ Map */}
+            {/* 🗺️ Map Display */}
             <MapContainer
                 center={[20.5937, 78.9629]}
                 zoom={5}
@@ -189,48 +227,60 @@ const LocationMap = () => {
                     selectedLocation={selectedLocation}
                     selectedFeature={selectedFeature}
                 />
-                <GeoBoundaries feature={selectedFeature} />
 
-                <form
-                    onSubmit={handleSearch}
-                    style={{ margin: "10px", display: "flex", alignItems: "center", justifyContent: "center" }}
-                >
-                    <input
-                        type="text"
-                        placeholder="Enter city, district, or location name"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        style={{ padding: "9px", width: "250px", zIndex: "450", borderRadius: "5px", border: "none", backgroundColor: "#fffff" }}
+                {/* 🟩 Selected district boundary */}
+                {selectedFeature && (
+                    <GeoJSON
+                        data={selectedFeature}
+                        style={{ color: "#023610", weight: 3, fillOpacity: 0 }}
+                        onEachFeature={(feature, layer) => {
+                            const name = feature.properties?.name || feature.properties?.tags?.name;
+                            if (name) {
+                                layer.bindPopup(name);
+                            }
+                        }}
                     />
-                    <button type="submit" style={{ padding: "4px 15px", marginLeft: "10px", zIndex: "450", borderRadius: "5px", backgroundColor: "#d4a3f0", borderColor: "white", fontWeight: "bold", fontSize: "15px", clolr: "#152102" }}>
-                        Go
-                    </button>
-                </form>
+                )}
 
-                <div className="loc-details">
+                {/* 🌈 All state boundaries */}
+                {stateBoundaries && (
+                    <GeoJSON
+                        data={stateBoundaries}
+                        style={(feature) => {
+                            const name =
+                                feature.properties?.ST_NM ||
+                                feature.properties?.name ||
+                                feature.properties?.tags?.name ||
+                                "State";
+                            return {
+                                color: getRandomColor(name),
+                                weight: 3,
+                                fillOpacity: 0.1,
+                            };
+                        }}
+                        onEachFeature={(feature, layer) => {
+                            const name =
+                                feature.properties?.ST_NM ||
+                                feature.properties?.name ||
+                                feature.properties?.tags?.name ||
+                                "Unknown";
+                            layer.bindPopup(name);
 
-                    <div >
+                            layer.on("click", () => {
+                                const bounds = layer.getBounds();
+                                if (bounds.isValid()) {
+                                    layer._map.flyToBounds(bounds, {
+                                        animate: true,
+                                        duration: 1,
+                                        maxZoom: 30,
+                                    });
+                                }
+                            });
+                        }}
+                    />
+                )}
 
-                        <div style={{ display: "flex", gap: "10px",dispaly:"flex",justifyContent:"center"}}>
-                            <img
-                                src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png"
-                                alt="Red Marker"
-                                style={{ width: "20px" , height:"25px"}}
-                            />
-                            <p style={{ margin: 0 , fontSize:"17px", fontFamily:"monospace"}}>Schools location</p>
-                        </div>
-
-                    </div>
-
-
-                    <div>
-
-                        {/* you can add location detals here */}
-
-                    </div>
-                </div>
-
-                {/* 📍 Render red markers for all points */}
+                {/* 📍 Point markers (schools or other locations) */}
                 {locations.map((loc) => (
                     <Marker
                         key={loc.id}
@@ -241,10 +291,13 @@ const LocationMap = () => {
                     </Marker>
                 ))}
 
-                {/* 📍 Highlight selected location (point only) */}
+                {/* 🔴 Selected point (highlight) */}
                 {selectedLocation && selectedLocation.type === "point" && (
                     <Marker
-                        position={[selectedLocation.latitude, selectedLocation.longitude]}
+                        position={[
+                            selectedLocation.latitude,
+                            selectedLocation.longitude,
+                        ]}
                         icon={redIcon}
                     >
                         <Popup>{selectedLocation.name} (Selected)</Popup>
