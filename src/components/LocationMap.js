@@ -14,15 +14,29 @@ import osmtogeojson from "osmtogeojson";
 
 // 🔴 Red marker icon
 const redIcon = new L.Icon({
-    iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
-    shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
+    iconUrl:
+        "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
+    shadowUrl:
+        "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
     iconSize: [25, 41],
     iconAnchor: [12, 41],
     popupAnchor: [1, -34],
     shadowSize: [41, 41],
 });
 
-// ✈️ Fly to point or polygon
+// 🔵 Blue marker icon
+const blueIcon = new L.Icon({
+    iconUrl:
+        "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png",
+    shadowUrl:
+        "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41],
+});
+
+// ✈️ Fly to selected point or polygon
 const FlyToLocation = ({ selectedLocation, selectedFeature }) => {
     const map = useMap();
 
@@ -30,11 +44,14 @@ const FlyToLocation = ({ selectedLocation, selectedFeature }) => {
         if (!selectedLocation) return;
 
         if (selectedLocation.type === "point") {
-            map.flyTo([selectedLocation.latitude, selectedLocation.longitude], 15, {
-                duration: 1,
-            });
+            map.flyTo(
+                [selectedLocation.latitude, selectedLocation.longitude],
+                15,
+                { duration: 1 }
+            );
         } else if (
-            (selectedLocation.type === "district" || selectedLocation.type === "state") &&
+            (selectedLocation.type === "district" ||
+                selectedLocation.type === "state") &&
             selectedFeature
         ) {
             const layer = L.geoJSON(selectedFeature);
@@ -63,32 +80,42 @@ const LocationMap = () => {
     const [selectedLocation, setSelectedLocation] = useState(null);
     const [stateBoundaries, setStateBoundaries] = useState(null);
 
-    // 🔴 Load school/point data
+    // 🏫 Load building point data
     useEffect(() => {
-        fetch("http://localhost:8080/locations")
+        fetch("http://localhost:8080/locations/buildings")
             .then((res) => res.json())
             .then((data) => {
                 if (Array.isArray(data)) {
                     const filtered = data.filter(
                         (loc) =>
-                            loc.id &&
-                            loc.name &&
+                            loc.building_address_id &&
+                            loc.building_name &&
                             typeof loc.latitude === "number" &&
                             typeof loc.longitude === "number"
                     );
-                    const withTypes = filtered.map((loc) => ({ ...loc, type: "point" }));
+
+                    const withTypes = filtered.map((loc) => ({
+                        id: loc.building_address_id,
+                        name: loc.building_name,
+                        latitude: loc.latitude,
+                        longitude: loc.longitude,
+                        type: "point",
+                        campus: loc.campus_name,
+                        college_type: loc.college_type,
+                    }));
+
                     setLocations(withTypes);
                 } else {
-                    console.error("Invalid location data");
+                    console.error("Invalid building location data");
                 }
             })
             .catch((err) => {
-                console.error("Error fetching locations:", err);
-                alert("Failed to fetch locations");
+                console.error("Error fetching buildings:", err);
+                alert("Failed to fetch building locations");
             });
     }, []);
 
-    // 🟦 Load India states GeoJSON
+    // 🗺️ Load state boundaries
     useEffect(() => {
         fetch("http://localhost:8080/india-states.geojson")
             .then((res) => res.json())
@@ -98,7 +125,9 @@ const LocationMap = () => {
                     features: geojson.features.filter(
                         (f) =>
                             f.geometry &&
-                            (f.properties?.ST_NM || f.properties?.name || f.properties?.tags?.name)
+                            (f.properties?.ST_NM ||
+                                f.properties?.name ||
+                                f.properties?.tags?.name)
                     ),
                 };
                 if (filtered.features.length > 0) {
@@ -112,7 +141,7 @@ const LocationMap = () => {
             });
     }, []);
 
-    // 🟩 Fetch district polygon from Overpass API
+    // 📦 Fetch district polygon
     const fetchDistrictBoundary = async (districtName) => {
         try {
             const res = await fetch(
@@ -156,7 +185,10 @@ const LocationMap = () => {
         setSelectedFeature(null);
 
         if (match) {
-            setSelectedLocation(match);
+            setSelectedLocation({
+                ...match,
+                type: "point", // Ensure it's a point for flying
+            });
         } else {
             fetchDistrictBoundary(search);
         }
@@ -164,7 +196,7 @@ const LocationMap = () => {
 
     return (
         <div>
-            {/* 🔍 Search Box */}
+            {/* 🔍 Search Bar */}
             <form
                 onSubmit={handleSearch}
                 style={{
@@ -185,7 +217,7 @@ const LocationMap = () => {
             >
                 <input
                     type="text"
-                    placeholder="Enter city, district, or state"
+                    placeholder="Enter building, district, or state"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     style={{
@@ -212,7 +244,7 @@ const LocationMap = () => {
                 </button>
             </form>
 
-            {/* 🗺️ Map Display */}
+            {/* 🗺️ Leaflet Map */}
             <MapContainer
                 center={[20.5937, 78.9629]}
                 zoom={5}
@@ -228,13 +260,15 @@ const LocationMap = () => {
                     selectedFeature={selectedFeature}
                 />
 
-                {/* 🟩 Selected district boundary */}
+                {/* 🟩 Selected District Boundary */}
                 {selectedFeature && (
                     <GeoJSON
                         data={selectedFeature}
                         style={{ color: "#023610", weight: 3, fillOpacity: 0 }}
                         onEachFeature={(feature, layer) => {
-                            const name = feature.properties?.name || feature.properties?.tags?.name;
+                            const name =
+                                feature.properties?.name ||
+                                feature.properties?.tags?.name;
                             if (name) {
                                 layer.bindPopup(name);
                             }
@@ -242,7 +276,7 @@ const LocationMap = () => {
                     />
                 )}
 
-                {/* 🌈 All state boundaries */}
+                {/* 🌈 State Boundaries */}
                 {stateBoundaries && (
                     <GeoJSON
                         data={stateBoundaries}
@@ -265,7 +299,6 @@ const LocationMap = () => {
                                 feature.properties?.tags?.name ||
                                 "Unknown";
                             layer.bindPopup(name);
-
                             layer.on("click", () => {
                                 const bounds = layer.getBounds();
                                 if (bounds.isValid()) {
@@ -280,27 +313,50 @@ const LocationMap = () => {
                     />
                 )}
 
-                {/* 📍 Point markers (schools or other locations) */}
-                {locations.map((loc) => (
-                    <Marker
-                        key={loc.id}
-                        position={[loc.latitude, loc.longitude]}
-                        icon={redIcon}
-                    >
-                        <Popup>{loc.name}</Popup>
-                    </Marker>
-                ))}
+                {/* 📍 Building Markers */}
+                {locations.map((loc) => {
+                    const iconToUse =
+                        loc.college_type?.toLowerCase() === "school"
+                            ? blueIcon
+                            : redIcon;
 
-                {/* 🔴 Selected point (highlight) */}
+                    return (
+                        <Marker
+                            key={loc.id}
+                            position={[loc.latitude, loc.longitude]}
+                            icon={iconToUse}
+                        >
+                            <Popup>
+                                <strong>{loc.name}</strong>
+                                <br />
+                                Campus: {loc.campus}
+                                <br />
+                                Type: {loc.college_type}
+                            </Popup>
+                        </Marker>
+                    );
+                })}
+
+                {/* 📍 Selected Marker */}
                 {selectedLocation && selectedLocation.type === "point" && (
                     <Marker
                         position={[
                             selectedLocation.latitude,
                             selectedLocation.longitude,
                         ]}
-                        icon={redIcon}
+                        icon={
+                            selectedLocation.college_type?.toLowerCase() === "school"
+                                ? blueIcon
+                                : redIcon
+                        }
                     >
-                        <Popup>{selectedLocation.name} (Selected)</Popup>
+                        <Popup>
+                            <strong>{selectedLocation.name}</strong> (Selected)
+                            <br />
+                            Campus: {selectedLocation.campus}
+                            <br />
+                            Type: {selectedLocation.college_type}
+                        </Popup>
                     </Marker>
                 )}
             </MapContainer>
