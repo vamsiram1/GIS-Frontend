@@ -1,0 +1,15 @@
+/* 🔴 Red Marker - Transparent with glow */
+ .leaflet-marker-icon[src*="marker-icon-red.png"] {
+  filter: drop-shadow(0 0 0px rgb(250, 88, 88)) opacity(0.7);
+  /* transform: scale(0.8); 
+   transition: transform 0.3s, filter 0.3s;   */
+  
+} 
+
+/* 🔵 Blue Marker - Transparent with glow */
+.leaflet-marker-icon[src*="marker-icon-blue.png"] {
+  filter: drop-shadow(0 0 0px rgba(0, 0, 255, 0.2)) opacity(0.7);
+  /* transform: scale(0.2); 
+  transition: transform 0.3s, filter 0.3s; */
+}
+
